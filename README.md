@@ -4,6 +4,11 @@ A static site that deploys on every push to `main`. No AWS access keys exist
 anywhere — GitHub authenticates to AWS with short-lived credentials via OIDC.
 All AWS resources are defined in CloudFormation.
 
+📐 **[Architecture diagram](https://samcyanide.github.io/oxbridge/)** — the deploy
+path end to end, from push to viewer. Served by GitHub Pages out of
+[`docs/`](docs/architecture.html) — separate from the S3 + CloudFront pipeline
+described below.
+
 ## How it works
 
 ```
@@ -29,6 +34,7 @@ narrowed to this one distribution.
 | `site/` | Everything here is published. Nothing outside it is. |
 | `infra/static-site.yaml` | All AWS resources. |
 | `.github/workflows/deploy.yml` | The pipeline. |
+| `docs/` | Architecture diagram, published to GitHub Pages. Not deployed to S3. |
 
 Site content is isolated in `site/` deliberately: syncing the repo root would
 publish the template, the README and local config to the public internet.
