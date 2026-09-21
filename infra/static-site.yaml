@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >-
+  Static site on a private S3 bucket fronted by CloudFront (Origin Access Control),
+  deployed from GitHub Actions via OIDC federation so no long-lived AWS keys exist.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    arch: >-
+      push -> GH Actions -> sts:AssumeRoleWithWebIdentity (OIDC) -> s3 sync -> CF invalidation.
+      viewers -> CloudFront -> OAC (SigV4) -> private bucket. Bucket has no public path.
+    must:
+      - No IAM user and no long-lived access keys anywhere in this system
+      - Bucket stays private; CloudFront via OAC is its only reader
+      - Deploy role assumable only from this repo AND this branch
+    owner: SamCyanide
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: SamCyanide
+    Description: GitHub account that owns the repo allowed to assume the deploy role.
+  GitHubRepo:
+    Type: String
+    Default: oxbridge
+    Description: Repository name allowed to assume the deploy role.
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Only pushes to this branch may assume the deploy role.
+  CreateOIDCProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: >-
+      An AWS account may hold only ONE provider per URL. Set false if another stack
+      already created the GitHub provider, so this stack reuses it instead of colliding.
+
+  BudgetNotificationEmail:
+    Type: String
+    Default: ''
+    Description: >-
+      Optional. If set, creates a $1/month budget alarm as a free-tier guardrail
+      (first 2 budgets per account are free). Leave blank to skip.
+
+Conditions:
+  ShouldCreateOIDCProvider: !Equals [!Ref CreateOIDCProvider, 'true']
+  ShouldCreateBudget: !Not [!Equals [!Ref BudgetNotificationEmail, '']]
+
+Resources:
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    # Delete (not Retain) is deliberate: contents are disposable build output that is
+    # fully reproducible from git. Retain would orphan the bucket and then block
+    # re-creating the stack under the same deterministic name.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Private origin. Name is derived from stack + account for global uniqueness
+          without hardcoding. No website hosting: that would force public access, and
+          OAC needs the REST endpoint anyway.
+        must:
+          - All four public access blocks stay true
+          - ACLs stay disabled (BucketOwnerEnforced)
+        mutable: change-with-constraints
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      # Cost guardrail: versioning is on for rollback, but old versions are billable
+      # storage. Expiring them keeps the bucket far inside the 5 GB free allowance.
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-noncurrent-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+          - Id: abort-incomplete-multipart-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Grants read to the CloudFront service principal only, narrowed by SourceArn to
+          THIS distribution (confused-deputy guard). Separate resource so the bucket does
+          not have to reference the distribution that references it.
+        must:
+          - Non-TLS access stays denied
+          - AWS:SourceArn condition stays pinned to this distribution
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: 's3:GetObject'
+            Resource: !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}'
+
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-oac'
+        Description: SigV4 access from CloudFront to the private site bucket.
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Public entry point and TLS terminator. PriceClass_100 keeps cost down for a demo.
+          403 -> /index.html because the bucket policy grants GetObject but not ListBucket,
+          so S3 answers a missing key with AccessDenied (403), never NoSuchKey (404).
+        must:
+          - ViewerProtocolPolicy stays redirect-to-https
+        mutable: free-to-tune
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${AWS::StackName} static site'
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        Origins:
+          - Id: s3-private-origin
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: s3-private-origin
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOIDCProvider
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Lets GitHub-issued tokens be exchanged for short-lived AWS credentials.
+          ThumbprintList is deliberately omitted: IAM now manages trust for this
+          endpoint, and pinned thumbprints in older templates go stale and break auth.
+        must:
+          - Audience stays restricted to sts.amazonaws.com
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          The only identity CI assumes. Trust is constructed from the provider ARN rather
+          than !Ref so the role works whether or not this stack created the provider.
+          sub is matched with StringLike on a full ref path - a bare repo match would let
+          ANY branch or a pull_request from a fork assume this role.
+        must:
+          - sub condition stays pinned to repo AND branch
+          - aud condition stays present (without it any GitHub repo could assume this)
+          - Write permissions stay scoped to this bucket and this distribution
+        mutable: review-required
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-github-deploy'
+      Description: !Sub 'Assumed by GitHub Actions in ${GitHubOwner}/${GitHubRepo} on ${GitHubBranch}.'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+              StringLike:
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOwner}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}'
+      Policies:
+        - PolicyName: publish-site
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListBucketForSyncDiff
+                Effect: Allow
+                Action: 's3:ListBucket'
+                Resource: !GetAtt SiteBucket.Arn
+              - Sid: WriteObjects
+                Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                  - 's3:DeleteObject'
+                Resource: !Sub '${SiteBucket.Arn}/*'
+              # Lets the workflow discover the bucket/distribution at run time
+              # instead of them being copied into GitHub repo variables.
+              - Sid: ResolveOwnStackOutputs
+                Effect: Allow
+                Action: 'cloudformation:DescribeStacks'
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+              - Sid: InvalidateCacheOnly
+                Effect: Allow
+                Action: 'cloudfront:CreateInvalidation'
+                Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}'
+
+  CostGuardrailBudget:
+    Type: AWS::Budgets::Budget
+    Condition: ShouldCreateBudget
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Tripwire, not a cap - AWS budgets alert but do not stop spend. $1 is chosen to
+          be below anything this stack should ever cost, so any alert means something
+          unexpected is running. Alerts on both actual and forecast.
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-freetier-guardrail'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+
+Outputs:
+  SiteURL:
+    Description: Public URL of the site.
+    Value: !Sub 'https://${SiteDistribution.DomainName}'
+  BucketName:
+    Description: Origin bucket (private).
+    Value: !Ref SiteBucket
+  DistributionId:
+    Description: Used by the workflow to invalidate cache.
+    Value: !Ref SiteDistribution
+  DeployRoleArn:
+    Description: Set as the AWS_DEPLOY_ROLE_ARN repo variable in GitHub.
+    Value: !GetAtt DeployRole.Arn

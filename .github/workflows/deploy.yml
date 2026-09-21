@@ -1,0 +1,92 @@
+name: Deploy site
+
+# The brief asks for "every push to main". A paths filter (site/** only) would cut
+# redundant deploys, but is deliberately omitted so behaviour matches the spec.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read       # checkout only
+  id-token: write      # REQUIRED to mint the OIDC token; without it auth fails
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false   # never cancel a half-finished sync
+
+env:
+  AWS_REGION: us-east-1
+
+  # The CloudFormation stack that owns every AWS resource below. Bucket,
+  # distribution and URL are read from its outputs at run time, so there is no
+  # repo-level configuration to drift out of sync with the infrastructure.
+  STACK_NAME: oxbridge-site
+
+  # NOTE: the deploy role ARN is intentionally NOT here. It lives in the repo
+  # variable AWS_DEPLOY_ROLE_ARN so this public repo does not disclose the AWS
+  # account ID. It is not a credential - the role's trust policy is what makes
+  # it safe, restricting assumption to this repo on this branch - but there is
+  # no reason to publish an account identifier.
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Exchanges the GitHub OIDC token for short-lived STS credentials.
+      # No access keys are stored in this repo.
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}
+
+      # Single source of truth: the stack. Nothing here is hardcoded or cached,
+      # so replacing the distribution can never leave this workflow pointing at
+      # a stale id.
+      - name: Resolve infrastructure from stack outputs
+        run: |
+          set -euo pipefail
+          outputs=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --query 'Stacks[0].Outputs' --output json)
+
+          get() { printf '%s' "$outputs" | jq -r --arg k "$1" \
+            '.[] | select(.OutputKey==$k) | .OutputValue'; }
+
+          bucket=$(get BucketName)
+          dist=$(get DistributionId)
+          url=$(get SiteURL)
+
+          # Fail loudly and early rather than running a sync against an empty target.
+          for pair in "BucketName:$bucket" "DistributionId:$dist" "SiteURL:$url"; do
+            if [ -z "${pair#*:}" ]; then
+              echo "::error::Stack '$STACK_NAME' has no output ${pair%%:*}. Is the stack deployed?"
+              exit 1
+            fi
+          done
+
+          {
+            echo "SITE_BUCKET=$bucket"
+            echo "CF_DISTRIBUTION_ID=$dist"
+            echo "SITE_URL=$url"
+          } >> "$GITHUB_ENV"
+
+          echo "Resolved bucket=$bucket distribution=$dist"
+
+      - name: Sync site to S3
+        run: aws s3 sync ./site "s3://$SITE_BUCKET" --delete
+
+      # "/*" counts as ONE invalidation path. 1,000 paths/month are free.
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "$CF_DISTRIBUTION_ID" \
+            --paths '/*'
+
+      - name: Summary
+        run: echo "Deployed to $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
