@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Oxbridge Deploy Path</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@600&display=swap">
+<style>
+  :root {
+    --paper:   #F3F6F8;
+    --surface: #FFFFFF;
+    --sunken:  #E8EEF2;
+    --ink:     #0F1A22;
+    --ink-2:   #51636F;
+    --ink-3:   #7C8E9A;
+    --line:    #D2DCE3;
+    --line-2:  #BCCAD4;
+    --teal:    #0E6E8A;
+    --teal-sub:#E0EFF4;
+    --ok:      #2E7D51;
+    --warn:    #A8500C;
+    --shadow:  0 1px 2px rgba(15,26,34,.06), 0 8px 24px -12px rgba(15,26,34,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #0B1216;
+      --surface: #131E25;
+      --sunken:  #0F1A20;
+      --ink:     #E4EDF2;
+      --ink-2:   #9FB1BD;
+      --ink-3:   #768894;
+      --line:    #23343E;
+      --line-2:  #31454F;
+      --teal:    #55BCD9;
+      --teal-sub:#10323E;
+      --ok:      #5CC28D;
+      --warn:    #DFA05C;
+      --shadow:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:   #0B1216;
+    --surface: #131E25;
+    --sunken:  #0F1A20;
+    --ink:     #E4EDF2;
+    --ink-2:   #9FB1BD;
+    --ink-3:   #768894;
+    --line:    #23343E;
+    --line-2:  #31454F;
+    --teal:    #55BCD9;
+    --teal-sub:#10323E;
+    --ok:      #5CC28D;
+    --warn:    #DFA05C;
+    --shadow:  0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 56px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 52px;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(30px, 5.2vw, 44px);
+    line-height: 1.1;
+    letter-spacing: -0.022em;
+    font-weight: 700;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 18px;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 44rem;
+  }
+  h2 {
+    font-size: 21px;
+    letter-spacing: -0.012em;
+    font-weight: 600;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  .sect-note { color: var(--ink-2); margin: 0 0 22px; max-width: 46rem; font-size: 15px; }
+  p { max-width: 46rem; }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 26px;
+    padding: 0;
+    list-style: none;
+  }
+  .meta li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+  .meta .k {
+    font-family: "IBM Plex Sans Condensed", sans-serif;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .meta .v { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; }
+  .meta a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  figure { margin: 0; }
+  .fig-scroll {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .fig-scroll svg { display: block; max-width: 100%; height: auto; min-width: 640px; }
+  figcaption {
+    margin-top: 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+    max-width: 46rem;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ---- shared SVG vocabulary ---- */
+  .node   { fill: var(--surface); stroke: var(--line-2); stroke-width: 1.5; }
+  .node-k { fill: var(--teal-sub); stroke: var(--teal); stroke-width: 1.5; }
+  .zone   { fill: none; stroke: var(--line-2); stroke-width: 1.25; stroke-dasharray: 5 5; }
+  .bound  { stroke: var(--teal); stroke-width: 1.5; stroke-dasharray: 3 6; }
+  .flow   { stroke: var(--ink-2); stroke-width: 1.6; fill: none; }
+  .flow-k { stroke: var(--teal); stroke-width: 2; fill: none; }
+  .flow-x { stroke: var(--warn); stroke-width: 1.6; fill: none; stroke-dasharray: 4 4; }
+
+  .t      { font-family: "IBM Plex Sans", sans-serif; font-size: 14.5px; font-weight: 600; fill: var(--ink); }
+  .t-sub  { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--ink-2); }
+  .t-arr  { font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; fill: var(--ink-2); }
+  .t-arrk { font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; font-weight: 600; fill: var(--teal); }
+  .t-zone { font-family: "IBM Plex Sans Condensed", sans-serif; font-size: 12px; font-weight: 600;
+            letter-spacing: .14em; fill: var(--ink-3); }
+  .t-mono { font-family: "IBM Plex Mono", monospace; font-size: 13px; fill: var(--ink); }
+  .t-lbl  { font-family: "IBM Plex Sans Condensed", sans-serif; font-size: 11px; font-weight: 600;
+            letter-spacing: .12em; fill: var(--ink-3); }
+  .hl     { fill: var(--teal); font-weight: 500; }
+  .x-mark { fill: var(--warn); font-weight: 600; }
+  .ok-mark{ fill: var(--ok);   font-weight: 600; }
+  .head-a { fill: var(--ink-2); }
+  .head-k { fill: var(--teal); }
+
+  /* ---- steps ---- */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line);
+           border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .steps li { background: var(--surface); padding: 14px 18px; display: grid;
+              grid-template-columns: 30px 1fr; gap: 14px; align-items: start; font-size: 15px; }
+  .steps .n { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--teal); font-weight: 500;
+              padding-top: 2px; }
+  .steps code { font-family: "IBM Plex Mono", monospace; font-size: 13px; background: var(--sunken);
+                padding: 1px 5px; border-radius: 4px; }
+
+  /* ---- table ---- */
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-family: "IBM Plex Sans Condensed", sans-serif; font-size: 11px; letter-spacing: .12em;
+       text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  td.act { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; white-space: nowrap; }
+  td.den { color: var(--ink-2); }
+  .tag { font-family: "IBM Plex Sans Condensed", sans-serif; font-size: 11px; letter-spacing: .08em;
+         text-transform: uppercase; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+  .tag-no { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+
+  .owns { list-style: none; margin: 0; padding: 0; display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .owns li { border: 1px solid var(--line); border-left: 2px solid var(--teal); border-radius: 0 8px 8px 0;
+             background: var(--surface); padding: 12px 14px; }
+  .owns .r { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink); display: block; }
+  .owns .d { font-size: 13px; color: var(--ink-2); display: block; margin-top: 3px; }
+
+  .foot { border-top: 1px solid var(--line); padding-top: 20px; color: var(--ink-3); font-size: 13.5px; }
+  .foot code { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+
+  @media (max-width: 560px) {
+    .wrap { padding-block: 40px 56px; gap: 40px; }
+    .steps li { grid-template-columns: 24px 1fr; gap: 10px; padding: 12px 14px; font-size: 14.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Architecture</p>
+    <h1>Oxbridge deploy path</h1>
+    <p class="standfirst">
+      A static site that redeploys on every push to <code style="font-family:'IBM Plex Mono',monospace;font-size:.92em">main</code>.
+      No AWS key exists anywhere in the repository — GitHub proves its identity with a signed token
+      and receives credentials that expire within the hour.
+    </p>
+    <ul class="meta">
+      <li><span class="k">Live</span><span class="v"><a href="https://d2ipm1umfa92am.cloudfront.net">d2ipm1umfa92am.cloudfront.net</a></span></li>
+      <li><span class="k">Region</span><span class="v">us-east-1</span></li>
+      <li><span class="k">Stack</span><span class="v">oxbridge-site</span></li>
+      <li><span class="k">Secrets</span><span class="v">0</span></li>
+    </ul>
+  </header>
+
+  <section>
+    <h2>How a push becomes a live page</h2>
+    <p class="sect-note">
+      The dashed line is the trust boundary. Everything left of it is GitHub; everything right is AWS.
+      What crosses is a short-lived token and a short-lived credential — never a stored key.
+    </p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1000 620" role="img"
+             aria-label="A push to main runs a GitHub Actions job, which exchanges an OIDC token with AWS STS for a temporary DeployRole session, then syncs files to a private S3 bucket and invalidates CloudFront. Viewers reach CloudFront over HTTPS, and CloudFront reads the private bucket with SigV4 through Origin Access Control.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="head-a"/>
+            </marker>
+            <marker id="ahk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="head-k"/>
+            </marker>
+          </defs>
+
+          <!-- zones -->
+          <rect class="zone" x="20"  y="70" width="310" height="200" rx="10"/>
+          <text class="t-zone" x="36"  y="94">GITHUB</text>
+          <rect class="zone" x="406" y="70" width="574" height="450" rx="10"/>
+          <text class="t-zone" x="422" y="94">AWS · US-EAST-1</text>
+
+          <!-- trust boundary -->
+          <line class="bound" x1="368" y1="44" x2="368" y2="600"/>
+          <text class="t-arrk" x="368" y="32" text-anchor="middle">trust boundary · nothing stored crosses it</text>
+
+          <!-- github nodes -->
+          <rect class="node" x="50" y="112" width="250" height="50" rx="6"/>
+          <text class="t" x="175" y="142" text-anchor="middle">git push → main</text>
+
+          <line class="flow" x1="175" y1="162" x2="175" y2="192" marker-end="url(#ah)"/>
+
+          <rect class="node" x="50" y="196" width="250" height="52" rx="6"/>
+          <text class="t"     x="175" y="217" text-anchor="middle">Actions runner</text>
+          <text class="t-sub" x="175" y="235" text-anchor="middle">id-token: write</text>
+
+          <!-- token exchange across the boundary -->
+          <line class="flow-k" x1="300" y1="210" x2="436" y2="210" marker-end="url(#ahk)"/>
+          <text class="t-arrk" x="368" y="200" text-anchor="middle">① OIDC token</text>
+
+          <line class="flow" x1="440" y1="238" x2="304" y2="238" marker-end="url(#ah)"/>
+          <text class="t-arr" x="368" y="256" text-anchor="middle">② credentials, ≤ 1 h</text>
+
+          <!-- aws nodes -->
+          <rect class="node-k" x="440" y="196" width="230" height="52" rx="6"/>
+          <text class="t"     x="555" y="217" text-anchor="middle">AWS STS</text>
+          <text class="t-sub" x="555" y="235" text-anchor="middle">AssumeRoleWithWebIdentity</text>
+
+          <line class="flow" x1="555" y1="248" x2="555" y2="302" marker-end="url(#ah)"/>
+          <text class="t-arr" x="568" y="278" text-anchor="start">checks sub + aud</text>
+
+          <rect class="node" x="440" y="306" width="230" height="56" rx="6"/>
+          <text class="t"     x="555" y="329" text-anchor="middle">DeployRole session</text>
+          <text class="t-sub" x="555" y="347" text-anchor="middle">4 scoped actions</text>
+
+          <line class="flow" x1="555" y1="362" x2="555" y2="426" marker-end="url(#ah)"/>
+          <text class="t-arr" x="568" y="398" text-anchor="start">③ s3 sync --delete</text>
+
+          <path class="flow" d="M 670 334 H 845 V 426" marker-end="url(#ah)"/>
+          <text class="t-arr" x="758" y="325" text-anchor="middle">④ create-invalidation /*</text>
+
+          <rect class="node" x="440" y="430" width="230" height="56" rx="6"/>
+          <text class="t"     x="555" y="453" text-anchor="middle">S3 · private origin</text>
+          <text class="t-sub" x="555" y="471" text-anchor="middle">public access blocked</text>
+
+          <rect class="node" x="730" y="430" width="230" height="56" rx="6"/>
+          <text class="t"     x="845" y="453" text-anchor="middle">CloudFront</text>
+          <text class="t-sub" x="845" y="471" text-anchor="middle">redirect-to-https</text>
+
+          <line class="flow" x1="726" y1="458" x2="674" y2="458" marker-end="url(#ah)"/>
+          <text class="t-arr" x="700" y="418" text-anchor="middle">GetObject · SigV4 (OAC)</text>
+
+          <!-- public -->
+          <rect class="node" x="730" y="552" width="230" height="46" rx="6"/>
+          <text class="t" x="845" y="581" text-anchor="middle">Viewer</text>
+          <line class="flow" x1="845" y1="552" x2="845" y2="490" marker-end="url(#ah)"/>
+          <text class="t-arr" x="858" y="525" text-anchor="start">HTTPS</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>The bucket has no public path.</b> Its only reader is CloudFront, authenticated with SigV4
+        through Origin Access Control and narrowed by bucket policy to this one distribution. A request
+        sent straight to the S3 endpoint returns 403.
+      </figcaption>
+    </figure>
+
+    <ol class="steps" style="margin-top:26px">
+      <li><span class="n">01</span><span>The runner asks GitHub for an OIDC token. This needs <code>id-token: write</code> — without it there is nothing to exchange.</span></li>
+      <li><span class="n">02</span><span>STS verifies the token's signature against the registered provider, then tests its <code>aud</code> and <code>sub</code> claims against the role's trust policy. Only then is a session issued.</span></li>
+      <li><span class="n">03</span><span>The session resolves the bucket and distribution from the CloudFormation stack's outputs, then syncs <code>site/</code> — nothing is copied into GitHub configuration.</span></li>
+      <li><span class="n">04</span><span>One invalidation path, <code>/*</code>, counts as a single path against the 1,000 free each month.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>The claim that decides everything</h2>
+    <p class="sect-note">
+      Step 02 is where this design nearly failed. GitHub issues <em>immutable</em> subject claims that
+      embed numeric owner and repository ids — so the subject is not the
+      <code style="font-family:'IBM Plex Mono',monospace;font-size:.92em">repo:OWNER/REPO</code> string
+      that almost every published example shows.
+    </p>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 1000 350" role="img"
+             aria-label="The OIDC token's subject claim contains numeric owner and repository ids. A trust policy written in the classic repo colon owner slash repo form does not match and STS denies the request; a policy written with the immutable id-bearing form matches and a session is issued.">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" class="head-a"/>
+            </marker>
+          </defs>
+
+          <!-- token -->
+          <rect class="node-k" x="20" y="112" width="352" height="116" rx="8"/>
+          <text class="t-lbl"  x="42" y="142">SUB CLAIM · AS SENT</text>
+          <text class="t-mono" x="42" y="172">repo:SamCyanide<tspan class="hl">@9272499</tspan>/</text>
+          <text class="t-mono" x="42" y="192">oxbridge<tspan class="hl">@1379066388</tspan>:</text>
+          <text class="t-mono" x="42" y="212">ref:refs/heads/main</text>
+
+          <path class="flow" d="M 372 158 C 400 158 402 100 428 100" marker-end="url(#ah2)"/>
+          <path class="flow" d="M 372 190 C 400 190 402 268 428 268" marker-end="url(#ah2)"/>
+
+          <!-- rejected pattern -->
+          <rect class="node" x="432" y="64" width="386" height="72" rx="8" stroke-dasharray="4 4"/>
+          <text class="t-lbl"  x="452" y="90">TRUST POLICY · CLASSIC FORM</text>
+          <text class="t-mono" x="452" y="118">repo:SamCyanide/oxbridge:ref:...</text>
+          <text class="t-arr"  x="838" y="94"  class="t-arr x-mark">✗  no match</text>
+          <text class="t-sub"  x="838" y="114">STS: Not authorized</text>
+
+          <!-- accepted pattern -->
+          <rect class="node-k" x="432" y="232" width="386" height="84" rx="8"/>
+          <text class="t-lbl"  x="452" y="258">TRUST POLICY · IMMUTABLE FORM</text>
+          <text class="t-mono" x="452" y="286">repo:SamCyanide<tspan class="hl">@9272499</tspan>/oxbridge<tspan class="hl">@1379066388</tspan></text>
+          <text class="t-mono" x="452" y="306">:ref:refs/heads/main</text>
+          <text class="t-arr"  x="838" y="262" class="t-arr ok-mark">✓  match</text>
+          <text class="t-sub"  x="838" y="282">session issued</text>
+        </svg>
+      </div>
+      <figcaption>
+        <b>The failure gives no hint of its cause.</b> A mismatched subject returns the same generic
+        <code style="font-family:'IBM Plex Mono',monospace;font-size:.92em">Not authorized to perform sts:AssumeRoleWithWebIdentity</code>
+        as a missing provider or a wrong audience. Read the real value with
+        <code style="font-family:'IBM Plex Mono',monospace;font-size:.92em">gh api repos/OWNER/REPO/actions/oidc/customization/sub</code>.
+        The id-bearing form is also the safer one: it survives a rename and cannot be inherited by
+        someone who re-registers a deleted repository name.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>What the pipeline is allowed to do</h2>
+    <p class="sect-note">
+      Four actions, each pinned to one resource. Verified against the live role with the IAM policy
+      simulator rather than assumed from the template.
+    </p>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th scope="col">Action</th><th scope="col">Scope</th><th scope="col">Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="act">s3:ListBucket</td><td>the site bucket</td><td>lets <code>sync</code> diff local against remote</td></tr>
+          <tr><td class="act">s3:PutObject</td><td>objects in that bucket</td><td>upload changed files</td></tr>
+          <tr><td class="act">s3:DeleteObject</td><td>objects in that bucket</td><td>honour <code>--delete</code></td></tr>
+          <tr><td class="act">cloudfront:CreateInvalidation</td><td>one distribution</td><td>clear the edge cache</td></tr>
+          <tr><td class="act">cloudformation:DescribeStacks</td><td>one stack</td><td>resolve bucket and distribution at run time</td></tr>
+          <tr><td class="act den">s3:GetObject</td><td colspan="2"><span class="tag tag-no">omitted</span> an upload-only sync never reads object bodies</td></tr>
+          <tr><td class="act den">s3:DeleteBucket</td><td colspan="2"><span class="tag tag-no">denied</span> the pipeline cannot destroy its own target</td></tr>
+          <tr><td class="act den">iam:PutRolePolicy</td><td colspan="2"><span class="tag tag-no">denied</span> the role cannot widen itself</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Defined in CloudFormation</h2>
+    <p class="sect-note">
+      One stack owns every AWS object above. GitHub-side configuration is a single repository variable
+      holding the role ARN; everything else is read from stack outputs on each run, so nothing can drift.
+    </p>
+    <ul class="owns">
+      <li><span class="r">AWS::S3::Bucket</span><span class="d">Private, versioned, SSE-S3, non-current versions expire after 7 days</span></li>
+      <li><span class="r">AWS::S3::BucketPolicy</span><span class="d">Denies non-TLS; allows only CloudFront, pinned by SourceArn</span></li>
+      <li><span class="r">AWS::CloudFront::OriginAccessControl</span><span class="d">SigV4 signing between distribution and bucket</span></li>
+      <li><span class="r">AWS::CloudFront::Distribution</span><span class="d">TLS termination, HTTP→HTTPS, PriceClass_100</span></li>
+      <li><span class="r">AWS::IAM::OIDCProvider</span><span class="d">GitHub as a federated identity provider; no pinned thumbprint</span></li>
+      <li><span class="r">AWS::IAM::Role</span><span class="d">Trust pinned to this repository and branch; four scoped actions</span></li>
+      <li><span class="r">AWS::Budgets::Budget</span><span class="d">$1/month tripwire on actual and forecast spend</span></li>
+    </ul>
+  </section>
+
+  <p class="foot">
+    Account identifiers are redacted as <code>&lt;account&gt;</code>. Sitting inside the AWS free tier:
+    CloudFront's 1 TB egress allowance is perpetual, S3's 5 GB is twelve months. Exceeded only past
+    1,000 deploys per month, where each further invalidation path costs $0.005.
+  </p>
+
+</div>
+</body>
+</html>
