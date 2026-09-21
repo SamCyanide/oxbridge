@@ -30,6 +30,16 @@ Parameters:
     Type: String
     Default: main
     Description: Only pushes to this branch may assume the deploy role.
+  GitHubSubjectPrefix:
+    Type: String
+    Default: 'repo:SamCyanide@9272499/oxbridge@1379066388'
+    Description: >-
+      The repo's OIDC subject prefix. GitHub issues IMMUTABLE subject claims that
+      embed numeric owner/repo ids, so this is NOT simply repo:OWNER/REPO - a trust
+      policy using the classic format is rejected by STS. Fetch the real value with
+      `gh api repos/OWNER/REPO/actions/oidc/customization/sub` and copy
+      sub_claim_prefix verbatim.
+
   CreateOIDCProvider:
     Type: String
     AllowedValues: ['true', 'false']
@@ -204,7 +214,9 @@ Resources:
           The only identity CI assumes. Trust is constructed from the provider ARN rather
           than !Ref so the role works whether or not this stack created the provider.
           sub is matched with StringLike on a full ref path - a bare repo match would let
-          ANY branch or a pull_request from a fork assume this role.
+          ANY branch or a pull_request from a fork assume this role. The subject uses
+          GitHub's IMMUTABLE form (numeric owner/repo ids), not repo:OWNER/REPO: the
+          classic format is what most examples show and STS rejects it outright here.
         must:
           - sub condition stays pinned to repo AND branch
           - aud condition stays present (without it any GitHub repo could assume this)
@@ -225,7 +237,7 @@ Resources:
               StringEquals:
                 'token.actions.githubusercontent.com:aud': sts.amazonaws.com
               StringLike:
-                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOwner}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}'
+                'token.actions.githubusercontent.com:sub': !Sub '${GitHubSubjectPrefix}:ref:refs/heads/${GitHubBranch}'
       Policies:
         - PolicyName: publish-site
           PolicyDocument:

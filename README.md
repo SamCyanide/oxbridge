@@ -80,6 +80,29 @@ repo is public and there is no reason to publish an AWS account identifier. It
 is not a credential: the role's trust policy is what makes it safe, restricting
 assumption to this repo on this branch.
 
+### 3. Check your OIDC subject prefix
+
+**This is the step most likely to break.** GitHub now issues *immutable* subject
+claims that embed numeric owner and repo ids, so the token's `sub` is **not** the
+`repo:OWNER/REPO:...` form nearly every tutorial shows:
+
+```
+actual:    repo:SamCyanide@9272499/oxbridge@1379066388:ref:refs/heads/main
+classic:   repo:SamCyanide/oxbridge:ref:refs/heads/main
+```
+
+A trust policy written the classic way is rejected by STS with
+`Not authorized to perform sts:AssumeRoleWithWebIdentity`, which gives no hint
+that the subject is the problem. Get your real prefix and pass it as the
+`GitHubSubjectPrefix` parameter:
+
+```bash
+gh api repos/OWNER/REPO/actions/oidc/customization/sub
+# -> {"use_immutable_subject": true, "sub_claim_prefix": "repo:OWNER@123/REPO@456"}
+```
+
+If `use_immutable_subject` is `false`, use the classic `repo:OWNER/REPO` form.
+
 ### Template parameters
 
 - `GitHubOwner` / `GitHubRepo` / `GitHubBranch` — who may assume the deploy role.
@@ -118,6 +141,11 @@ fork**, deploy to production. Pinning the full `ref:refs/heads/main` path is the
 difference between a deploy role and an open door.
 
 ## Decisions
+
+**Trust pinned to the immutable subject claim.** The role trusts
+`repo:OWNER@<id>/REPO@<id>:ref:refs/heads/main`, not `repo:OWNER/REPO:...`. Beyond
+being what GitHub actually sends here, the id-based form survives a repo or account
+rename and cannot be hijacked by deleting a repo and re-registering its name.
 
 **CloudFront + OAC rather than S3 website hosting.** S3 static hosting needs a
 public bucket. OAC keeps the bucket entirely private, and adds HTTPS, which S3
